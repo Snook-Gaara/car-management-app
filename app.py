@@ -2,7 +2,14 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Thailand timezone = UTC+7
+TH_TZ = timezone(timedelta(hours=7))
+
+def now_th():
+    """Return current datetime in Thailand timezone (UTC+7)."""
+    return datetime.now(TH_TZ)
 
 # --- Page Configuration ---
 st.set_page_config(page_title="ระบบจัดการสถานะการใช้รถ", layout="wide")
@@ -38,7 +45,7 @@ if "history" not in st.session_state:
 
 # --- Header ---
 st.title("🚗 ระบบเช็คสถานะการใช้รถรายวัน")
-st.write(f"วันที่ปัจจุบัน: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+st.write(f"วันที่ปัจจุบัน: {now_th().strftime('%d/%m/%Y %H:%M')}")
 
 # ============================================================
 # Section 1: Summary Table
@@ -77,7 +84,7 @@ if available_cars:
         elif not borrow_dest.strip():
             st.warning("กรุณาระบุสถานที่ไป")
         else:
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            now_str = now_th().strftime("%Y-%m-%d %H:%M")
             for car in st.session_state.cars:
                 if car["ยี่ห้อ"] == borrow_car:
                     car["สถานะ"]  = "กำลังใช้งาน"
@@ -120,7 +127,7 @@ if in_use_cars:
             st.caption(f"ผู้ยืม: **{c['คนใช้']}**  |  สถานที่: **{c['สถานที่']}**  |  ยืมเมื่อ: **{c['เวลายืม']}**")
 
     if st.button("🔙 คืนรถ", type="secondary"):
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        now_str = now_th().strftime("%Y-%m-%d %H:%M")
         returned_user = "-"
 
         for car in st.session_state.cars:
@@ -169,7 +176,7 @@ if st.session_state.history:
     df_history = pd.DataFrame(st.session_state.history)
 
     df_history["_dt_ยืม"] = pd.to_datetime(df_history["วันที่ยืม"], errors="coerce")
-    seven_days_ago = datetime.now() - timedelta(days=7)
+    seven_days_ago = now_th().replace(tzinfo=None) - timedelta(days=7)
 
     filtered = (
         df_history[df_history["_dt_ยืม"] >= seven_days_ago]
