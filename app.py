@@ -67,95 +67,95 @@ def highlight_status(row):
 st.dataframe(df_current.style.apply(highlight_status, axis=1), use_container_width=True)
 
 # ============================================================
-# Section 2: ยืมรถ
+# Section 2 & 3: ยืมรถ / คืนรถ (จัดกรอบให้ชัดเจน ใช้งานง่าย)
 # ============================================================
 st.divider()
-st.subheader("🔑 ยืมรถ")
 
-available_cars = [c["ยี่ห้อ"] for c in st.session_state.cars if c["สถานะ"] == "ว่าง"]
+borrow_box, return_box = st.columns(2, gap="medium")
 
-if available_cars:
-    col1, col2 = st.columns(2)
-    with col1:
-        borrow_car  = st.selectbox("เลือกรถที่ต้องการยืม", available_cars, key="borrow_car")
-        borrow_name = st.text_input("ชื่อผู้ยืม", placeholder="ระบุชื่อผู้ขับ", key="borrow_name")
-    with col2:
-        borrow_dest = st.text_input("สถานที่ไป", placeholder="ระบุจุดหมาย", key="borrow_dest")
+# ---------------- ยืมรถ ----------------
+with borrow_box:
+    with st.container(border=True):
+        st.markdown("### 🔑 ยืมรถ")
+        available_cars = [c["ยี่ห้อ"] for c in st.session_state.cars if c["สถานะ"] == "ว่าง"]
 
-    if st.button("✅ ยืมรถ", type="primary"):
-        if not borrow_name.strip():
-            st.warning("กรุณาระบุชื่อผู้ยืม")
-        elif not borrow_dest.strip():
-            st.warning("กรุณาระบุสถานที่ไป")
+        if available_cars:
+            borrow_car  = st.selectbox("เลือกรถที่ต้องการยืม", available_cars, key="borrow_car")
+            borrow_name = st.text_input("ชื่อผู้ยืม", placeholder="ระบุชื่อผู้ขับ", key="borrow_name")
+            borrow_dest = st.text_input("สถานที่ไป", placeholder="ระบุจุดหมาย", key="borrow_dest")
+
+            if st.button("✅ ยืมรถ", type="primary", use_container_width=True):
+                if not borrow_name.strip():
+                    st.warning("กรุณาระบุชื่อผู้ยืม")
+                elif not borrow_dest.strip():
+                    st.warning("กรุณาระบุสถานที่ไป")
+                else:
+                    now_str = now_th().strftime("%Y-%m-%d %H:%M")
+                    for car in st.session_state.cars:
+                        if car["ยี่ห้อ"] == borrow_car:
+                            car["สถานะ"]  = "กำลังใช้งาน"
+                            car["คนใช้"]  = borrow_name.strip()
+                            car["สถานที่"] = borrow_dest.strip()
+                            car["เวลายืม"] = now_str
+
+                    log = {
+                        "วันที่ยืม":    now_str,
+                        "วันที่คืน":    "-",
+                        "ผู้ใช้":       borrow_name.strip(),
+                        "รถ":           borrow_car,
+                        "สถานที่":      borrow_dest.strip(),
+                        "สถานะบันทึก": "ยืม",
+                    }
+                    st.session_state.history.append(log)
+
+                    save_json(CARS_FILE,    st.session_state.cars)
+                    save_json(HISTORY_FILE, st.session_state.history)
+
+                    st.success(f"บันทึกการยืมรถ **{borrow_car}** โดย **{borrow_name}** เรียบร้อยแล้ว!")
+                    st.rerun()
         else:
-            now_str = now_th().strftime("%Y-%m-%d %H:%M")
-            for car in st.session_state.cars:
-                if car["ยี่ห้อ"] == borrow_car:
-                    car["สถานะ"]  = "กำลังใช้งาน"
-                    car["คนใช้"]  = borrow_name.strip()
-                    car["สถานที่"] = borrow_dest.strip()
-                    car["เวลายืม"] = now_str
+            st.info("ขณะนี้ไม่มีรถว่าง")
 
-            log = {
-                "วันที่ยืม":    now_str,
-                "วันที่คืน":    "-",
-                "ผู้ใช้":       borrow_name.strip(),
-                "รถ":           borrow_car,
-                "สถานที่":      borrow_dest.strip(),
-                "สถานะบันทึก": "ยืม",
-            }
-            st.session_state.history.append(log)
+# ---------------- คืนรถ ----------------
+with return_box:
+    with st.container(border=True):
+        st.markdown("### 🔄 คืนรถ")
+        in_use_cars = [c["ยี่ห้อ"] for c in st.session_state.cars if c["สถานะ"] == "กำลังใช้งาน"]
 
-            save_json(CARS_FILE,    st.session_state.cars)
-            save_json(HISTORY_FILE, st.session_state.history)
+        if in_use_cars:
+            return_car = st.selectbox("เลือกรถที่ต้องการคืน", in_use_cars, key="return_car")
 
-            st.success(f"บันทึกการยืมรถ **{borrow_car}** โดย **{borrow_name}** เรียบร้อยแล้ว!")
-            st.rerun()
-else:
-    st.info("ขณะนี้ไม่มีรถว่าง")
+            # Show who borrowed it
+            for c in st.session_state.cars:
+                if c["ยี่ห้อ"] == return_car:
+                    st.caption(f"ผู้ยืม: **{c['คนใช้']}**  |  สถานที่: **{c['สถานที่']}**  |  ยืมเมื่อ: **{c['เวลายืม']}**")
 
-# ============================================================
-# Section 3: คืนรถ
-# ============================================================
-st.divider()
-st.subheader("🔄 คืนรถ")
+            if st.button("🔙 คืนรถ", type="secondary", use_container_width=True):
+                now_str = now_th().strftime("%Y-%m-%d %H:%M")
+                returned_user = "-"
 
-in_use_cars = [c["ยี่ห้อ"] for c in st.session_state.cars if c["สถานะ"] == "กำลังใช้งาน"]
+                for car in st.session_state.cars:
+                    if car["ยี่ห้อ"] == return_car:
+                        returned_user    = car["คนใช้"]
+                        car["สถานะ"]    = "ว่าง"
+                        car["คนใช้"]    = "-"
+                        car["สถานที่"]  = "-"
+                        car["เวลายืม"]  = "-"
 
-if in_use_cars:
-    return_car = st.selectbox("เลือกรถที่ต้องการคืน", in_use_cars, key="return_car")
+                # Update the matching borrow log with return time
+                for log in reversed(st.session_state.history):
+                    if log["รถ"] == return_car and log["สถานะบันทึก"] == "ยืม" and log["วันที่คืน"] == "-":
+                        log["วันที่คืน"]    = now_str
+                        log["สถานะบันทึก"] = "คืนแล้ว"
+                        break
 
-    # Show who borrowed it
-    for c in st.session_state.cars:
-        if c["ยี่ห้อ"] == return_car:
-            st.caption(f"ผู้ยืม: **{c['คนใช้']}**  |  สถานที่: **{c['สถานที่']}**  |  ยืมเมื่อ: **{c['เวลายืม']}**")
+                save_json(CARS_FILE,    st.session_state.cars)
+                save_json(HISTORY_FILE, st.session_state.history)
 
-    if st.button("🔙 คืนรถ", type="secondary"):
-        now_str = now_th().strftime("%Y-%m-%d %H:%M")
-        returned_user = "-"
-
-        for car in st.session_state.cars:
-            if car["ยี่ห้อ"] == return_car:
-                returned_user    = car["คนใช้"]
-                car["สถานะ"]    = "ว่าง"
-                car["คนใช้"]    = "-"
-                car["สถานที่"]  = "-"
-                car["เวลายืม"]  = "-"
-
-        # Update the matching borrow log with return time
-        for log in reversed(st.session_state.history):
-            if log["รถ"] == return_car and log["สถานะบันทึก"] == "ยืม" and log["วันที่คืน"] == "-":
-                log["วันที่คืน"]    = now_str
-                log["สถานะบันทึก"] = "คืนแล้ว"
-                break
-
-        save_json(CARS_FILE,    st.session_state.cars)
-        save_json(HISTORY_FILE, st.session_state.history)
-
-        st.success(f"บันทึกการคืนรถ **{return_car}** โดย **{returned_user}** เรียบร้อยแล้ว!")
-        st.rerun()
-else:
-    st.write("ขณะนี้ไม่มีรถที่กำลังถูกใช้งาน")
+                st.success(f"บันทึกการคืนรถ **{return_car}** โดย **{returned_user}** เรียบร้อยแล้ว!")
+                st.rerun()
+        else:
+            st.write("ขณะนี้ไม่มีรถที่กำลังถูกใช้งาน")
 
 # ============================================================
 # Section 4: Who is out now?
@@ -256,14 +256,8 @@ if st.session_state.fuel:
     show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "ผู้จ่าย", "หมายเหตุ"]
     st.dataframe(filtered_fuel[show_fuel_cols], use_container_width=True)
 
-    total_baht = filtered_fuel["จำนวนเงิน (บาท)"].sum()
     total_liters = pd.to_numeric(filtered_fuel["จำนวนลิตร"], errors="coerce").sum()
-
-    scol1, scol2 = st.columns(2)
-    with scol1:
-        st.metric("💰 ยอดรวมค่าน้ำมัน (ตามตัวกรอง)", f"{total_baht:,.2f} บาท")
-    with scol2:
-        st.metric("⛽ ยอดรวมจำนวนลิตร (ตามตัวกรอง)", f"{total_liters:,.2f} ลิตร")
+    st.metric("⛽ ยอดรวมจำนวนลิตร (ตามตัวกรอง)", f"{total_liters:,.2f} ลิตร")
 
     with st.expander("📈 สรุปค่าน้ำมันแยกตามรถ (ทั้งหมด)"):
         summary = (
