@@ -223,53 +223,6 @@ with st.form("fuel_form", clear_on_submit=True):
                 st.success(f"บันทึกค่าน้ำมันรถ **{fuel_car}** จำนวน **{total_amount:,.2f} บาท** เรียบร้อยแล้ว!")
                 st.rerun()
 
-# --- แสดงประวัติการเติมน้ำมัน + สรุปยอด ---
-if st.session_state.fuel:
-    df_fuel = pd.DataFrame(st.session_state.fuel)
-
-    # ตัวกรอง: เลือกรถ / ช่วงวันที่
-    fcol_a, fcol_b = st.columns([1, 2])
-    with fcol_a:
-        filter_car = st.selectbox("กรองตามรถ", ["ทั้งหมด"] + all_car_names, key="filter_fuel_car")
-    with fcol_b:
-        min_date = pd.to_datetime(df_fuel["วันที่"]).min().date()
-        max_date = pd.to_datetime(df_fuel["วันที่"]).max().date()
-        date_range = st.date_input(
-            "ช่วงวันที่", value=(min_date, max_date), key="filter_fuel_date"
-        )
-
-    filtered_fuel = df_fuel.copy()
-    filtered_fuel["_dt"] = pd.to_datetime(filtered_fuel["วันที่"])
-
-    if filter_car != "ทั้งหมด":
-        filtered_fuel = filtered_fuel[filtered_fuel["รถ"] == filter_car]
-
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_d, end_d = date_range
-        filtered_fuel = filtered_fuel[
-            (filtered_fuel["_dt"] >= pd.to_datetime(start_d)) &
-            (filtered_fuel["_dt"] <= pd.to_datetime(end_d))
-        ]
-
-    filtered_fuel = filtered_fuel.drop(columns=["_dt"]).sort_values(by="วันที่", ascending=False).reset_index(drop=True)
-
-    show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "ผู้จ่าย", "หมายเหตุ"]
-    st.dataframe(filtered_fuel[show_fuel_cols], use_container_width=True)
-
-    total_liters = pd.to_numeric(filtered_fuel["จำนวนลิตร"], errors="coerce").sum()
-    st.metric("⛽ ยอดรวมจำนวนลิตร (ตามตัวกรอง)", f"{total_liters:,.2f} ลิตร")
-
-    with st.expander("📈 สรุปค่าน้ำมันแยกตามรถ (ทั้งหมด)"):
-        summary = (
-            df_fuel.groupby("รถ")["จำนวนเงิน (บาท)"]
-            .sum()
-            .reset_index()
-            .sort_values(by="จำนวนเงิน (บาท)", ascending=False)
-        )
-        st.dataframe(summary, use_container_width=True)
-else:
-    st.write("ยังไม่มีประวัติการเติมน้ำมัน")
-
 # ============================================================
 # Section 6: 7-Day History Log
 # ============================================================
