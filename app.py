@@ -187,7 +187,6 @@ with st.form("fuel_form", clear_on_submit=True):
         fuel_liters = st.number_input("จำนวนลิตร", min_value=0.0, step=0.1, format="%.2f", key="fuel_liters")
         fuel_price_per_liter = st.number_input("ราคาต่อลิตร (บาท)", min_value=0.0, step=0.1, format="%.2f", key="fuel_price_per_liter")
     with fcol3:
-        fuel_odometer = st.text_input("เลขไมล์ (ถ้ามี)", placeholder="เช่น 123456", key="fuel_odometer")
         fuel_payer = st.text_input("ผู้จ่าย/ผู้เติม", placeholder="ระบุชื่อผู้เติมน้ำมัน", key="fuel_payer")
 
     fuel_note = st.text_input("หมายเหตุ (ถ้ามี)", placeholder="เช่น ปั๊ม ปตท. สาขา...", key="fuel_note")
@@ -215,7 +214,6 @@ with st.form("fuel_form", clear_on_submit=True):
                     "จำนวนลิตร": round(fuel_liters, 2) if fuel_liters > 0 else "-",
                     "ราคาต่อลิตร": round(fuel_price_per_liter, 2) if fuel_price_per_liter > 0 else "-",
                     "จำนวนเงิน (บาท)": round(total_amount, 2),
-                    "เลขไมล์": fuel_odometer.strip() if fuel_odometer.strip() else "-",
                     "ผู้จ่าย": fuel_payer.strip(),
                     "หมายเหตุ": fuel_note.strip() if fuel_note.strip() else "-",
                     "บันทึกเมื่อ": now_th().strftime("%Y-%m-%d %H:%M"),
@@ -255,7 +253,7 @@ if st.session_state.fuel:
 
     filtered_fuel = filtered_fuel.drop(columns=["_dt"]).sort_values(by="วันที่", ascending=False).reset_index(drop=True)
 
-    show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "เลขไมล์", "ผู้จ่าย", "หมายเหตุ"]
+    show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "ผู้จ่าย", "หมายเหตุ"]
     st.dataframe(filtered_fuel[show_fuel_cols], use_container_width=True)
 
     total_baht = filtered_fuel["จำนวนเงิน (บาท)"].sum()
