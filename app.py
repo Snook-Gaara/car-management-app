@@ -17,6 +17,7 @@ st.set_page_config(page_title="ระบบจัดการสถานะก�
 # --- File paths for persistent storage ---
 CARS_FILE = "cars_data.json"
 HISTORY_FILE = "history_data.json"
+FUEL_FILE = "fuel_data.json"
 
 # --- Default car data ---
 DEFAULT_CARS = [
@@ -42,6 +43,9 @@ if "cars" not in st.session_state:
 
 if "history" not in st.session_state:
     st.session_state.history = load_json(HISTORY_FILE, [])
+
+if "fuel" not in st.session_state:
+    st.session_state.fuel = load_json(FUEL_FILE, [])
 
 # --- Header ---
 st.title("🚗 ระบบเช็คสถานะการใช้รถรายวัน")
@@ -167,7 +171,115 @@ else:
     st.success("✅ ขณะนี้รถทุกคันจอดอยู่ที่สำนักงาน")
 
 # ============================================================
-# Section 5: 7-Day History Log
+# Section 5: ⛽ บันทึกค่าใช้จ่ายการเติมน้ำมัน
+# ============================================================
+st.divider()
+st.subheader("⛽ บันทึกค่าใช้จ่ายการเติมน้ำมัน")
+
+all_car_names = [c["ยี่ห้อ"] for c in st.session_state.cars]
+
+with st.form("fuel_form", clear_on_submit=True):
+    fcol1, fcol2, fcol3 = st.columns(3)
+    with fcol1:
+        fuel_car = st.selectbox("เลือกรถ", all_car_names, key="fuel_car")
+        fuel_date = st.date_input("วันที่เติมน้ำมัน", value=now_th().date(), key="fuel_date")
+    with fcol2:
+        fuel_liters = st.number_input("จำนวนลิตร", min_value=0.0, step=0.1, format="%.2f", key="fuel_liters")
+        fuel_price_per_liter = st.number_input("ราคาต่อลิตร (บาท)", min_value=0.0, step=0.1, format="%.2f", key="fuel_price_per_liter")
+    with fcol3:
+        fuel_odometer = st.text_input("เลขไมล์ (ถ้ามี)", placeholder="เช่น 123456", key="fuel_odometer")
+        fuel_payer = st.text_input("ผู้จ่าย/ผู้เติม", placeholder="ระบุชื่อผู้เติมน้ำมัน", key="fuel_payer")
+
+    fuel_note = st.text_input("หมายเหตุ (ถ้ามี)", placeholder="เช่น ปั๊ม ปตท. สาขา...", key="fuel_note")
+
+    fuel_amount_manual = st.number_input(
+        "จำนวนเงินรวม (บาท) — หากไม่กรอก จะคำนวณจากลิตร x ราคาต่อลิตร",
+        min_value=0.0, step=1.0, format="%.2f", key="fuel_amount_manual"
+    )
+
+    submitted = st.form_submit_button("✅ บันทึกค่าน้ำมัน", type="primary")
+
+    if submitted:
+        if not fuel_payer.strip():
+            st.warning("กรุณาระบุชื่อผู้เติมน้ำมัน")
+        else:
+            calculated_amount = fuel_liters * fuel_price_per_liter
+            total_amount = fuel_amount_manual if fuel_amount_manual > 0 else calculated_amount
+
+            if total_amount <= 0:
+                st.warning("กรุณาระบุจำนวนเงิน หรือ จำนวนลิตรและราคาต่อลิตร")
+            else:
+                fuel_record = {
+                    "วันที่": fuel_date.strftime("%Y-%m-%d"),
+                    "รถ": fuel_car,
+                    "จำนวนลิตร": round(fuel_liters, 2) if fuel_liters > 0 else "-",
+                    "ราคาต่อลิตร": round(fuel_price_per_liter, 2) if fuel_price_per_liter > 0 else "-",
+                    "จำนวนเงิน (บาท)": round(total_amount, 2),
+                    "เลขไมล์": fuel_odometer.strip() if fuel_odometer.strip() else "-",
+                    "ผู้จ่าย": fuel_payer.strip(),
+                    "หมายเหตุ": fuel_note.strip() if fuel_note.strip() else "-",
+                    "บันทึกเมื่อ": now_th().strftime("%Y-%m-%d %H:%M"),
+                }
+                st.session_state.fuel.append(fuel_record)
+                save_json(FUEL_FILE, st.session_state.fuel)
+                st.success(f"บันทึกค่าน้ำมันรถ **{fuel_car}** จำนวน **{total_amount:,.2f} บาท** เรียบร้อยแล้ว!")
+                st.rerun()
+
+# --- แสดงประวัติการเติมน้ำมัน + สรุปยอด ---
+if st.session_state.fuel:
+    df_fuel = pd.DataFrame(st.session_state.fuel)
+
+    # ตัวกรอง: เลือกรถ / ช่วงวันที่
+    fcol_a, fcol_b = st.columns([1, 2])
+    with fcol_a:
+        filter_car = st.selectbox("กรองตามรถ", ["ทั้งหมด"] + all_car_names, key="filter_fuel_car")
+    with fcol_b:
+        min_date = pd.to_datetime(df_fuel["วันที่"]).min().date()
+        max_date = pd.to_datetime(df_fuel["วันที่"]).max().date()
+        date_range = st.date_input(
+            "ช่วงวันที่", value=(min_date, max_date), key="filter_fuel_date"
+        )
+
+    filtered_fuel = df_fuel.copy()
+    filtered_fuel["_dt"] = pd.to_datetime(filtered_fuel["วันที่"])
+
+    if filter_car != "ทั้งหมด":
+        filtered_fuel = filtered_fuel[filtered_fuel["รถ"] == filter_car]
+
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_d, end_d = date_range
+        filtered_fuel = filtered_fuel[
+            (filtered_fuel["_dt"] >= pd.to_datetime(start_d)) &
+            (filtered_fuel["_dt"] <= pd.to_datetime(end_d))
+        ]
+
+    filtered_fuel = filtered_fuel.drop(columns=["_dt"]).sort_values(by="วันที่", ascending=False).reset_index(drop=True)
+
+    show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "เลขไมล์", "ผู้จ่าย", "หมายเหตุ"]
+    st.dataframe(filtered_fuel[show_fuel_cols], use_container_width=True)
+
+    total_baht = filtered_fuel["จำนวนเงิน (บาท)"].sum()
+    total_liters = pd.to_numeric(filtered_fuel["จำนวนลิตร"], errors="coerce").sum()
+
+    scol1, scol2 = st.columns(2)
+    with scol1:
+        st.metric("💰 ยอดรวมค่าน้ำมัน (ตามตัวกรอง)", f"{total_baht:,.2f} บาท")
+    with scol2:
+        st.metric("⛽ ยอดรวมจำนวนลิตร (ตามตัวกรอง)", f"{total_liters:,.2f} ลิตร")
+
+    with st.expander("📈 สรุปค่าน้ำมันแยกตามรถ (ทั้งหมด)"):
+        summary = (
+            df_fuel.groupby("รถ")["จำนวนเงิน (บาท)"]
+            .sum()
+            .reset_index()
+            .sort_values(by="จำนวนเงิน (บาท)", ascending=False)
+        )
+        st.dataframe(summary, use_container_width=True)
+else:
+    st.write("ยังไม่มีประวัติการเติมน้ำมัน")
+
+# ============================================================
+# Section 6: 7-Day History Log
 # ============================================================
 st.divider()
 st.subheader("📜 ประวัติการใช้รถ (ย้อนหลัง 7 วัน)")
