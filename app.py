@@ -223,6 +223,32 @@ with st.form("fuel_form", clear_on_submit=True):
                 st.success(f"บันทึกค่าน้ำมันรถ **{fuel_car}** จำนวน **{total_amount:,.2f} บาท** เรียบร้อยแล้ว!")
                 st.rerun()
 
+# --- ประวัติการเติมน้ำมัน (ย้อนหลัง 7 วัน) ---
+st.markdown("#### 📜 ประวัติการเติมน้ำมัน (ย้อนหลัง 7 วัน)")
+
+if st.session_state.fuel:
+    df_fuel = pd.DataFrame(st.session_state.fuel)
+    df_fuel["_dt"] = pd.to_datetime(df_fuel["วันที่"], errors="coerce")
+    seven_days_ago_fuel = now_th().replace(tzinfo=None) - timedelta(days=7)
+
+    filtered_fuel = (
+        df_fuel[df_fuel["_dt"] >= seven_days_ago_fuel]
+        .drop(columns=["_dt"])
+        .sort_values(by="วันที่", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    if not filtered_fuel.empty:
+        show_fuel_cols = ["วันที่", "รถ", "จำนวนลิตร", "ราคาต่อลิตร", "จำนวนเงิน (บาท)", "ผู้จ่าย", "หมายเหตุ"]
+        st.dataframe(filtered_fuel[show_fuel_cols], use_container_width=True)
+
+        total_liters_7d = pd.to_numeric(filtered_fuel["จำนวนลิตร"], errors="coerce").sum()
+        st.metric("⛽ ยอดรวมจำนวนลิตร (7 วันที่ผ่านมา)", f"{total_liters_7d:,.2f} ลิตร")
+    else:
+        st.info("ไม่มีประวัติการเติมน้ำมันในช่วง 7 วันที่ผ่านมา")
+else:
+    st.write("ยังไม่มีประวัติการเติมน้ำมัน")
+
 # ============================================================
 # Section 6: 7-Day History Log
 # ============================================================
